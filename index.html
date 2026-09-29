@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>قلعة توديع العزوبية</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Aref+Ruqaa:wght@700&family=Readex+Pro:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+  --paper:#fff4f1; --ink:#4a2a3c; --rose:#e98aa0; --plum:#6b4a8f; --gold:#f5c542; --soft:#8b6a7c;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){ --paper:#2e2238; --ink:#fbe7ee; --soft:#cdb3c4; }
+}
+:root[data-theme="dark"]{ --paper:#2e2238; --ink:#fbe7ee; --soft:#cdb3c4; }
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:#3b3170;overflow:hidden;font-family:"Readex Pro",Tahoma,Arial,sans-serif;color:var(--ink)}
+canvas{position:fixed;inset:0;width:100%;height:100%;image-rendering:pixelated;image-rendering:crisp-edges;display:block}
+.card{
+  position:fixed;left:50%;transform:translate(-50%,0);
+  bottom:calc(6% + env(safe-area-inset-bottom,0px));
+  width:min(92vw,400px);background:var(--paper);
+  border:3px solid var(--ink);box-shadow:6px 6px 0 var(--plum);
+  padding:22px 20px 20px;text-align:center;
+  transition:opacity .5s, transform .5s;
+}
+.card.hidden{opacity:0;pointer-events:none;transform:translate(-50%,16px)}
+.card.top{bottom:auto;top:calc(8% + env(safe-area-inset-top,0px))}
+h1{font-family:"Aref Ruqaa","Traditional Arabic",serif;font-weight:700;font-size:clamp(28px,7vw,36px);line-height:1.25;margin:0 0 8px;color:var(--ink)}
+p{margin:0 0 14px;line-height:1.8;font-size:16px;color:var(--soft)}
+.ticket{display:grid;grid-template-columns:1fr 1fr;border:2px dashed var(--rose);margin:4px 0 16px}
+.ticket div{padding:10px 6px}
+.ticket div+div{border-right:2px dashed var(--rose)}
+.ticket span{display:block;font-size:13px;color:var(--soft)}
+.ticket strong{display:block;font-size:19px;margin-top:2px}
+.btns{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;position:relative}
+button{
+  font:600 16px "Readex Pro",Tahoma,sans-serif;cursor:pointer;
+  padding:11px 20px;border:3px solid var(--ink);background:var(--rose);color:#3a1a2a;
+  box-shadow:3px 3px 0 var(--ink);transition:transform .08s, box-shadow .08s;
+}
+button:active{transform:translate(3px,3px);box-shadow:0 0 0 var(--ink)}
+button:focus-visible{outline:3px solid var(--gold);outline-offset:3px}
+button.ghost{background:transparent;color:var(--ink)}
+#no{transition:transform .25s}
+.hint{position:fixed;top:calc(4% + env(safe-area-inset-top,0px));left:0;right:0;text-align:center;
+  font-family:"Aref Ruqaa",serif;font-size:clamp(20px,5vw,28px);color:#fff4f1;text-shadow:2px 2px 0 #3b3170;
+  transition:opacity .6s;pointer-events:none}
+.hint.hidden{opacity:0}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="hint hidden" id="hint">يلا نمشي للقلعة…</div>
+
+<section class="card" id="intro">
+  <h1>يا هلا والله! حيّاك في قلعة توديع العزوبية</h1>
+  <p>قبل ليلة العمر بكم يوم سوّينا لك ليلة خاصة بين الورد والوناسة. بس عشان توصلين للقلعة لازم تعدّين ٣ تحديات بالطريق… موافقة؟</p>
+  <div class="btns">
+    <button id="yes">موافقة</button>
+    <button id="no" class="ghost">ما أقدر</button>
+  </div>
+</section>
+
+<section class="card top hidden" id="final">
+  <h1>وصلتي القلعة يا حلوة 🎆</h1>
+  <p>هنا بنودّع العزوبية سوا، وجيتك هي اللي تكمّل الفرحة.</p>
+  <div class="ticket">
+    <div><span>المكان</span><strong>شاليه سما</strong></div>
+    <div><span>التاريخ</span><strong>الجمعة ١٦ أكتوبر</strong></div>
+  </div>
+  <p style="font-family:'Aref Ruqaa',serif;font-size:22px;color:var(--ink);margin:0 0 14px">من صاحباتك 💗</p>
+  <div class="btns"><button id="again" class="ghost">عيدي الرحلة</button></div>
+</section>
+
+<section class="card hidden" id="ch">
+  <small id="chStep" style="display:block;color:var(--soft);font-size:13px;margin-bottom:4px"></small>
+  <h1 id="chTitle"></h1>
+  <p id="chText"></p>
+  <div class="btns" id="chBtns"></div>
+</section>
+
+<script>
+(function(){
+const cvs=document.getElementById('c'), ctx=cvs.getContext('2d');
+const LH=160; let LW=240;
+const WORLD=640, CX=560, FOOT=139, START=36;
+const ROCK=165, PUD=305, GATE=445;
+let obs={rock:true,gate:true}, jumpY=0;
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function resize(){
+  LW=Math.max(96,Math.round(LH*innerWidth/innerHeight));
+  cvs.width=LW; cvs.height=LH; ctx.imageSmoothingEnabled=false;
+}
+addEventListener('resize',resize); resize();
+
+/* ---------- seeded random ---------- */
+let seed=7; const rnd=()=>{seed=(seed*16807)%2147483647;return (seed-1)/2147483646};
+const R=(a,b)=>a+Math.random()*(b-a);
+
+/* ---------- character sprite (original, inspired by the uploaded look) ---------- */
+const PAL={H:'#5b3b30',h:'#7d5345',B:'#f4a3b8',S:'#f8e1db',E:'#6b5540',w:'#ffffff',r:'#f2b8bd',m:'#e39aa3',
+  P:'#f6ccd3',D:'#2a2226',G:'#6f6f73',L:'#f3d6d0',W:'#a3a3a8'};
+const BODY=[
+".....HHHHHH.....",
+"...HHhHHHHhHH...",
+"..HHHHHhHHHHHH..",
+"..HBBHHHHHHhHH..",
+".HHBHHhHHHHHHHH.",
+".HHHHSHHSSHHhHH.",
+".HhHSSSSSSSSHHH.",
+".HHSSSSSSSSSSHH.",
+".HHSEESSSSEESHH.",
+"HHHSEwSSSSEwSHhH",
+"HhHSSSSSSSSSSHHH",
+"HHHSSrSSSSrSSHHH",
+"HHhHSSSmmSSSHHHH",
+"HHHHHSSSSSSHHhHH",
+"HHHHPPPPPPPPHHHH",
+"HhHPPDPPPPDPPHHH",
+"HHSPPPPDPPPPPSHH",
+"HHSPDPPPPPDPPShH",
+".HSPPPPDPPPPPSH.",
+"..SGGGGGGGGGGS..",
+"...GGGGGGGGGG..."];
+const LEGS=[
+["....LL....LL....","....LL....LL....","...WWW....WWW..."],
+[".....LL..LL.....",".....LL..LL.....","....WWW.WWW....."],
+["...LL......LL...","...LL......LL...","..WWW......WWW.."]];
+function drawGirl(x,y,frame){
+  const rows=BODY.concat(LEGS[frame]);
+  for(let j=0;j<rows.length;j++){const row=rows[j];
+    for(let i=0;i<16;i++){const c=row[i]; if(c&&c!=='.'){ctx.fillStyle=PAL[c];ctx.fillRect(x+i,y+j,1,1);}}}
+}
+
+/* ---------- flowers ---------- */
+const SUN=[".YYY.","YNNNY","YNNNY","YNNNY",".YYY."];
+const LILY=["W.p.W",".WpW.","WWyWW",".WWW."];
+const FPAL={Y:'#f7c93a',N:'#6b3d1f',W:'#fff6f8',p:'#f39cb7',y:'#f5c542',Q:'#f7a8c2'};
+function pat(p,x,y,s,swap){
+  for(let j=0;j<p.length;j++)for(let i=0;i<p[j].length;i++){let c=p[j][i];if(c==='.')continue;
+    if(swap&&c==='W')c='Q'; ctx.fillStyle=FPAL[c];ctx.fillRect(x+i*s,y+j*s,s,s);}
+}
+function flower(f,cam,t){
+  const x=Math.round(f.x-cam), sway=Math.round(Math.sin(t*1.6+f.x)*0.6);
+  if(x<-12||x>LW+12)return;
+  const s=f.s, stemH=f.h;
+  ctx.fillStyle='#3f7d3a'; ctx.fillRect(x+2*s,f.y-stemH,s,stemH);
+  ctx.fillStyle='#57a24c'; ctx.fillRect(x+2*s+s,f.y-Math.round(stemH*0.5),s*2,s);
+  const hy=f.y-stemH-(f.type==='sun'?5:4)*s;
+  pat(f.type==='sun'?SUN:LILY,x+sway,hy,s,f.pink);
+}
+const flowers=[];
+for(let x=4;x<CX-44;x+=6+Math.floor(rnd()*5)){
+  flowers.push({x,y:118+Math.floor(rnd()*12),s:1,h:6+Math.floor(rnd()*6),type:rnd()<.55?'sun':'lily',pink:rnd()<.4});
+}
+for(let x=0;x<WORLD;x+=9+Math.floor(rnd()*7)){
+  if(Math.abs(x-CX)<18)continue;
+  flowers.push({x,y:156+Math.floor(rnd()*4),s:rnd()<.35?2:1,h:8+Math.floor(rnd()*6),type:rnd()<.5?'sun':'lily',pink:rnd()<.4,front:true});
+}
+const back=flowers.filter(f=>!f.front).sort((a,b)=>a.y-b.y), front=flowers.filter(f=>f.front).sort((a,b)=>a.y-b.y);
+const stars=[];for(let i=0;i<60;i++)stars.push({x:rnd()*900,y:rnd()*55,p:rnd()*6});
+const clouds=[];for(let i=0;i<7;i++)clouds.push({x:rnd()*900,y:20+rnd()*40,w:14+rnd()*18});
+
+/* ---------- scenery ---------- */
+const SKY=['#2f2a5e','#3b3170','#56408a','#7a4f98','#a45f9f','#cf729f','#ec8e9e','#f6ae9c','#fbcfa4'];
+function sky(t,cam){
+  const bh=Math.ceil(112/SKY.length);
+  SKY.forEach((c,i)=>{ctx.fillStyle=c;ctx.fillRect(0,i*bh,LW,bh+1);});
+  stars.forEach(s=>{const x=Math.round(((s.x-cam*0.05)%900+900)%900); if(x>LW)return;
+    ctx.fillStyle=Math.sin(t*2+s.p)>0.3?'#fff':'#c9b8e8'; ctx.fillRect(x,Math.round(s.y),1,1);});
+  // moon
+  ctx.fillStyle='#fff3d6'; const mx=Math.round(LW*0.8-cam*0.03);
+  ctx.fillRect(mx,14,6,6);ctx.fillRect(mx-1,15,8,4);ctx.fillRect(mx+1,13,4,8);
+  clouds.forEach(c=>{const x=Math.round(((c.x-cam*0.15+t*2)%900+900)%900)-40; if(x>LW)return;
+    ctx.fillStyle='#f5b6c3';ctx.fillRect(x,Math.round(c.y),Math.round(c.w),3);
+    ctx.fillRect(x+3,Math.round(c.y)-2,Math.round(c.w*0.5),2);
+    ctx.fillStyle='#e48ea8';ctx.fillRect(x+2,Math.round(c.y)+3,Math.round(c.w)-3,1);});
+}
+function hills(cam){
+  for(let x=0;x<LW;x++){
+    const wx=x+cam*0.3, h1=Math.round(96+Math.sin(wx*0.03)*6+Math.sin(wx*0.011)*5);
+    ctx.fillStyle='#7d5a93';ctx.fillRect(x,h1,1,114-h1);
+    const wx2=x+cam*0.6, h2=Math.round(104+Math.sin(wx2*0.045+1)*4);
+    ctx.fillStyle='#4f8a55';ctx.fillRect(x,h2,1,114-h2);
+  }
+  ctx.fillStyle='#5a9e4d';ctx.fillRect(0,112,LW,LH-112);
+  ctx.fillStyle='#4e9043';
+  for(let y=116;y<LH;y+=4)for(let x=((y*7)-Math.round(cam))%6;x<LW;x+=6)ctx.fillRect(x,y,1,1);
+}
+function path(cam){
+  ctx.fillStyle='#e0bd8f';ctx.fillRect(0,133,LW,10);
+  ctx.fillStyle='#c9a276';ctx.fillRect(0,133,LW,1);ctx.fillRect(0,142,LW,1);
+  for(let x=(-Math.round(cam))%11;x<LW;x+=11){ctx.fillRect(x+3,136,2,1);ctx.fillRect(x+8,139,1,1);}
+}
+function rect(x,y,w,h,c){ctx.fillStyle=c;ctx.fillRect(Math.round(x),Math.round(y),w,h);}
+function castle(cam,t){
+  const x=Math.round(CX-cam), base=134;
+  if(x<-80||x>LW+80)return;
+  const stone='#f3d3dc',shade='#dcaabb',line='#c98fa6',roof='#b3547c',roofD='#8e3f62';
+  // back keep
+  rect(x-18,base-68,36,68,shade);
+  for(let i=0;i<5;i++)rect(x-18+i*8,base-72,4,4,shade);
+  rect(x-6,base-86,12,18,stone);
+  for(let j=0;j<8;j++){rect(x-7+j,base-86-j*2,14-j*2,2,j%2?roof:roofD);} 
+  rect(x,base-104,1,8,'#6a3b52');
+  const fw=Math.sin(t*6)>0?1:0; rect(x+1,base-104,5+fw,3,'#f5c542');
+  // front wall
+  rect(x-34,base-40,68,40,stone);
+  for(let i=0;i<9;i++)rect(x-34+i*8,base-44,4,4,stone);
+  for(let r=0;r<5;r++)for(let c=0;c<9;c++)rect(x-33+c*8+(r%2)*4,base-36+r*7,5,1,line);
+  // towers
+  [-38,30].forEach(o=>{
+    rect(x+o,base-58,12,58,stone); rect(x+o+9,base-58,3,58,shade);
+    for(let i=0;i<3;i++)rect(x+o+i*5,base-62,3,4,stone);
+    for(let j=0;j<8;j++)rect(x+o-1+j,base-62-7-j*2,14-j*2,2,j%2?roof:roofD);
+    rect(x+o+6,base-84,1,7,'#6a3b52'); rect(x+o+7,base-84,4+fw,2,'#f39cb7');
+    rect(x+o+4,base-48,4,6,'#ffe08a'); rect(x+o+4,base-26,4,6,'#ffe08a');
+  });
+  // windows + door
+  rect(x-20,base-30,5,7,'#ffe08a');rect(x+15,base-30,5,7,'#ffe08a');
+  rect(x-8,base-22,16,22,'#6a3b52'); rect(x-6,base-24,12,2,'#6a3b52'); rect(x-4,base-26,8,2,'#6a3b52');
+  rect(x-1,base-22,1,22,'#4d2a3c');
+  // garland
+  for(let i=0;i<16;i++){rect(x-30+i*4,base-38+Math.round(Math.sin(i)*1),2,2,i%2?'#f39cb7':'#fff6f8');}
+}
+
+function obstacles(cam,t){
+  const b=137;
+  // puddle
+  let x=Math.round(PUD-cam);
+  rect(x-10,b-1,20,4,'#6fb3e0'); rect(x-8,b-2,16,1,'#6fb3e0'); rect(x-7,b+3,14,1,'#6fb3e0');
+  rect(x-5,b,4,1,'#cfeaff'); if(Math.sin(t*3)>0)rect(x+3,b+1,2,1,'#cfeaff');
+  if(obs.rock){x=Math.round(ROCK-cam);
+    rect(x-8,b-10,16,12,'#8d8a93'); rect(x-6,b-13,11,3,'#8d8a93'); rect(x-4,b-15,6,2,'#8d8a93');
+    rect(x+4,b-10,4,12,'#6e6b75'); rect(x-5,b-11,4,2,'#b3b0ba'); rect(x-2,b-6,3,1,'#6e6b75');}
+  x=Math.round(GATE-cam);
+  rect(x-12,b-22,3,24,'#b3547c'); rect(x+9,b-22,3,24,'#b3547c');
+  rect(x-13,b-25,5,3,'#f5c542'); rect(x+8,b-25,5,3,'#f5c542');
+  if(obs.gate){for(let i=0;i<5;i++)rect(x-8+i*4,b-18,2,20,'#f3d3dc');
+    rect(x-9,b-15,18,2,'#dcaabb'); rect(x-9,b-5,18,2,'#dcaabb'); rect(x-1,b-10,2,3,'#f5c542');}
+  else{rect(x-11,b-18,2,20,'#f3d3dc');rect(x+9,b-18,2,20,'#f3d3dc');}
+}
+/* ---------- particles ---------- */
+const COLORS=['#f39cb7','#f5c542','#ffffff','#ff7fa8','#b9a6ff','#ffd38a'];
+let rockets=[],sparks=[],hearts=[];
+function launch(){rockets.push({x:R(LW*0.12,LW*0.88),y:LH-40,vy:-R(75,100),ty:R(12,55),c:COLORS[Math.floor(Math.random()*COLORS.length)]});}
+function burst(x,y,c){const n=reduce?16:34;for(let i=0;i<n;i++){const a=Math.PI*2*i/n,sp=R(18,42);
+  sparks.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,life:R(1,1.7),max:1.7,c:Math.random()<.25?'#fff':c});}}
+function heart(x,y){hearts.push({x,y,vy:-R(12,20),life:2.2,ph:Math.random()*6});}
+const HEART=[".XX.XX.","XXXXXXX",".XXXXX.","..XXX..","...X..."];
+
+/* ---------- state ---------- */
+let state='intro', charX=START, frame=0, fTimer=0, arriveT=0, fwTimer=0, last=performance.now(), T=0;
+const intro=document.getElementById('intro'), fin=document.getElementById('final'), hint=document.getElementById('hint');
+
+document.getElementById('yes').onclick=()=>{
+  intro.classList.add('hidden'); state='walk';
+  for(let i=0;i<6;i++)setTimeout(()=>heart(START+R(-4,4),FOOT-26),i*140);
+  setTimeout(()=>hint.classList.remove('hidden'),500);
+};
+const no=document.getElementById('no'); let dodges=0;
+function dodge(e){ if(e)e.preventDefault(); dodges++;
+  no.style.transform=`translate(${R(-110,110)}px,${R(-70,10)}px)`;
+  if(dodges>2)no.textContent='لا والله ما فيه اعتذار 😄';
+  if(dodges>4){no.style.display='none';}
+}
+no.addEventListener('pointerenter',dodge); no.addEventListener('click',dodge);
+document.getElementById('again').onclick=()=>{
+  fin.classList.add('hidden'); charX=START; rockets=[];sparks=[]; obs={rock:true,gate:true}; stopI=0; state='walk';
+  setTimeout(()=>hint.classList.remove('hidden'),300);
+};
+
+const ch=document.getElementById('ch'), chStep=document.getElementById('chStep'), chTitle=document.getElementById('chTitle'),
+  chText=document.getElementById('chText'), chBtns=document.getElementById('chBtns');
+const stops=[{at:ROCK-16,id:'rock'},{at:PUD-18,id:'pud'},{at:GATE-18,id:'gate'}]; let stopI=0, jumpT=0, jumpFrom=0;
+function btn(label,fn,ghost){const b=document.createElement('button');b.textContent=label;if(ghost)b.className='ghost';b.onclick=fn;chBtns.appendChild(b);return b;}
+function done(){ch.classList.add('hidden');stopI++;state='walk';}
+function openCh(id){
+  state='stop';frame=0;chBtns.innerHTML='';hint.classList.add('hidden');
+  chStep.textContent='التحدي '+['١','٢','٣'][stopI]+' من ٣';
+  if(id==='rock'){chTitle.textContent='صخرة سدّت الدرب! 🪨';chText.textContent='دقّي على الزر ٦ مرات بسرعة عشان تزحفينها من الطريق';
+    let n=0;const b=btn('زحفي (٠/٦)',()=>{n++;b.textContent='زحفي ('+'٠١٢٣٤٥٦'[n]+'/٦)';
+      if(n>=6){obs.rock=false;b.disabled=true;chText.textContent='كفو عليك! الطريق صار فاضي 👏';setTimeout(done,900);}});}
+  if(id==='pud'){chTitle.textContent='قدامك بركة ماي 💦';chText.textContent='لا تتبللين! اضغطي نطّي وتعدّينها';
+    btn('نطّي!',()=>{ch.classList.add('hidden');state='jump';jumpT=0;jumpFrom=charX;});}
+  if(id==='gate'){chTitle.textContent='البوابة مقفلة 🔒';chText.textContent='ما تنفتح إلا إذا حليتي اللغز: وش الشي اللي كل ما زاد نقص؟';
+    [['الفلوس',0],['العمر',1],['الشاهي',0]].forEach(([l,ok])=>{const b=btn(l,()=>{
+      if(ok){obs.gate=false;chText.textContent='صح عليك! البوابة انفتحت 🎉';chBtns.querySelectorAll('button').forEach(x=>x.disabled=true);setTimeout(done,1000);}
+      else{chText.textContent='قريبة… بس لا، فكّري زين 😄 وش الشي اللي كل ما زاد نقص؟';b.disabled=true;}},true);});}
+  setTimeout(()=>ch.classList.remove('hidden'),250);
+}
+function loop(now){
+  const dt=Math.min(0.05,(now-last)/1000); last=now; T+=dt;
+  if(state==='walk'){
+    if(stopI<stops.length&&charX>=stops[stopI].at){charX=stops[stopI].at;openCh(stops[stopI].id);}
+    else{    charX+=46*dt; fTimer+=dt; if(fTimer>0.16){fTimer=0;frame=frame===1?2:1;}
+    if(charX>=CX){charX=CX;state='arrive';arriveT=0;frame=0;hint.classList.add('hidden');
+      for(let i=0;i<3;i++)setTimeout(launch,i*250);
+      setTimeout(()=>fin.classList.remove('hidden'),1400);}
+    }
+  }
+  if(state==='jump'){jumpT+=dt;const k=Math.min(1,jumpT/0.7);charX=jumpFrom+40*k;jumpY=Math.sin(Math.PI*k)*16;frame=2;
+    if(k>=1){jumpY=0;frame=0;stopI++;state='walk';}}
+  if(state==='arrive'){arriveT+=dt; fwTimer-=dt; if(fwTimer<=0){launch(); fwTimer=reduce?1.4:R(0.35,0.8);} }
+  const cam=Math.max(0,Math.min(WORLD-LW,charX-LW*0.45));
+
+  sky(T,cam); 
+  rockets=rockets.filter(r=>{r.y+=r.vy*dt; if(r.y<=r.ty){burst(r.x,r.y,r.c);return false;}
+    rect(r.x,r.y,1,2,'#fff'); rect(r.x,r.y+2,1,2,r.c); return true;});
+  sparks=sparks.filter(s=>{s.life-=dt; s.vy+=22*dt; s.vx*=0.985; s.x+=s.vx*dt; s.y+=s.vy*dt;
+    if(s.life<=0)return false; const sz=s.life>s.max*0.6?2:1; if(s.life<0.3&&Math.random()<.5)return true;
+    rect(s.x,s.y,sz,sz,s.c); return true;});
+  hills(cam);
+  back.forEach(f=>flower(f,cam,T));
+  castle(cam,T);
+  path(cam);
+  obstacles(cam,T);
+  const bob=(state==='walk'&&frame===1)?-1:0;
+  drawGirl(Math.round(charX-cam-8),FOOT-24+bob-Math.round(jumpY),frame);
+  hearts=hearts.filter(h=>{h.life-=dt;h.y+=h.vy*dt; if(h.life<=0)return false;
+    const hx=Math.round(h.x-cam+Math.sin(T*3+h.ph)*3), hy=Math.round(h.y);
+    for(let j=0;j<5;j++)for(let i=0;i<7;i++)if(HEART[j][i]==='X')rect(hx+i-3,hy+j,1,1,'#ff7fa8'); return true;});
+  front.forEach(f=>flower(f,cam,T));
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
